@@ -40,6 +40,9 @@
 
 #include <sx126x_hal.h>
 #include "sx126x_hal_context.h"
+/* Declares sx126x_hal_radio_awake_hook() + the SX126X_HAS_RADIO_AWAKE_HOOK
+ * fork sentinel an application build-asserts against (H-31). */
+#include <sx126x_rf_frontend_hook.h>
 
 LOG_MODULE_DECLARE( lora_sx126x, CONFIG_LORA_BASICS_MODEM_DRIVERS_LOG_LEVEL );
 
