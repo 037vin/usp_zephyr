@@ -40,6 +40,9 @@
 
 #include <sx126x_hal.h>
 #include "sx126x_hal_context.h"
+/* Declares sx126x_hal_radio_awake_hook() + the SX126X_HAS_RADIO_AWAKE_HOOK
+ * fork sentinel an application build-asserts against (H-31). */
+#include <sx126x_rf_frontend_hook.h>
 
 LOG_MODULE_DECLARE( lora_sx126x, CONFIG_LORA_BASICS_MODEM_DRIVERS_LOG_LEVEL );
 
@@ -78,6 +81,19 @@ static void sx126x_hal_wait_on_busy( const void* context )
     }
 }
 
+/* devSensor local patch (upstream candidate): RF-frontend power hook.
+ * Boards with an externally powered RF switch / antenna path need it
+ * energized only while the radio can emit or receive. The radio's own
+ * sleep/awake state is the exact proxy, and this HAL is the single
+ * owner of that state — notify on every transition. Weak default is a
+ * no-op; the application overrides it. May run in any context that
+ * touches the radio: implementations must be ISR-safe. */
+__attribute__( ( weak ) ) void sx126x_hal_radio_awake_hook( const void* context, bool awake )
+{
+    ARG_UNUSED( context );
+    ARG_UNUSED( awake );
+}
+
 /**
  * @brief Wake up the radio and ensure it's ready
  *
@@ -103,6 +119,7 @@ static void sx126x_hal_check_device_ready( const void* context )
         gpio_pin_set_dt( cs, 0 );
         sx126x_hal_wait_on_busy( context );
         data->radio_status = RADIO_AWAKE;
+        sx126x_hal_radio_awake_hook( context, true );
     }
 }
 
@@ -139,6 +156,7 @@ sx126x_hal_status_t sx126x_hal_write( const void* context, const uint8_t* comman
     if( command[0] == 0x84 )
     {
         dev_data->radio_status = RADIO_SLEEP;
+        sx126x_hal_radio_awake_hook( context, false );
         k_usleep( 500 );
     }
     else
@@ -187,6 +205,7 @@ sx126x_hal_status_t sx126x_hal_reset( const void* context )
     k_msleep( 5 );
 
     data->radio_status = RADIO_AWAKE;
+    sx126x_hal_radio_awake_hook( context, true );
     return SX126X_HAL_STATUS_OK;
 }
 
